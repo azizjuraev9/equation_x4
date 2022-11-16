@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <sqlite3.h>
 #include <string>
+#include <array>
+#include <vector>
+
+using namespace std;
 
 long double getX_1s(long double x_1, long double x_2, long double x_3, long double x_4) {
     return x_1 * x_1 + (2 * x_1 * x_2) + (2 * x_1 * x_3) + (2 * x_1 * x_4);
@@ -56,9 +60,9 @@ int main()
     char* zErrMsg = 0;
     int rc;
 
-    std::cout << "Enter step size: ";
-    std::cin >> step;
-    std::cout << std::endl;
+    cout << "Enter step size: ";
+    cin >> step;
+    cout << endl;
 
     rc = sqlite3_open("results.db", &db);
     if (rc) {
@@ -83,19 +87,21 @@ int main()
 
     execSql(db, "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES(1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2)");
 
-    std::cout << "start!" << std::endl;
-    std::cout << 0.25 + 0.25 + 0.25 + 0.25 << std::endl;
+    cout << "Start!" << endl;
+    cout << 0.25 + 0.25 + 0.25 + 0.25 << endl;
     bool limit = false;
+
+    vector<array<long double, 8>> results;
 
     for (x_1 = step; x_1 >= 0; x_1 -= 1) {
         if (limit) {
-            continue;
+            cout << "Limit!" << endl;
+            break;
         }
         for (x_2 = step; x_2 >= 0; x_2 -= 1) {
             for (x_3 = step; x_3 >= 0; x_3 -= 1) {
                 for (x_4 = step; x_4 >= 0; x_4 -= 1) {
 
-                    //std::cout << x_1 + x_2 + x_3 + x_4 << " " << x_1 << " " << x_2 << " " << x_3 << " " << x_4 << std::endl;
                     if( (x_1 + x_2 + x_3 + x_4) != step) {
                         continue;
                     }
@@ -105,25 +111,12 @@ int main()
                     long double sx_3 = x_3 / step;
                     long double sx_4 = x_4 / step;
 
-                    //std::cout << "step!" << std::endl;
                     long double x_1s = getX_1s(sx_1, sx_2, sx_3, sx_4);
                     long double x_2s = getX_2s(sx_2, sx_3, sx_4);
                     long double x_3s = getX_3s(sx_3, sx_4);
                     long double x_4s = getX_4s(sx_4);
 
-                    std::string SQL = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES(";
-                    SQL += std::to_string(sx_1) + ",";
-                    SQL += std::to_string(sx_2) + ",";
-                    SQL += std::to_string(sx_3) + ",";
-                    SQL += std::to_string(sx_4) + ",";
-                    SQL += std::to_string(x_1s) + ",";
-                    SQL += std::to_string(x_2s) + ",";
-                    SQL += std::to_string(x_3s) + ",";
-                    SQL += std::to_string(x_4s) + ")";
-
-                    const char* cSQL = SQL.c_str();
-
-                    execSql(db, cSQL);
+                    results.push_back({ sx_1, sx_2, sx_3, sx_4, x_1s, x_2s, x_3s, x_4s });
 
                     if (
                         old_x_1s == x_1s
@@ -131,6 +124,7 @@ int main()
                         && old_x_3s == x_3s
                         && old_x_4s == x_4s
                         ) {
+                        results.push_back({ sx_1, sx_2, sx_3, sx_4, x_1s, x_2s, x_3s, x_4s });
                         limit = true;
                     }
                     old_x_1s = x_1s;
@@ -144,8 +138,54 @@ int main()
         std::cout << 100 - (100 * (x_1 / step)) << "%" << std::endl;
     }
 
+    vector<string> sql_insert_batches;
+
+
+    cout << "Found : " << results.size() << " results\n";
+    cout << "Preparing SQLs\n";
+
+    int batch_size = 0;
+    string batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
+    int index = 0;
+    while (index < results.size()) {
+        array<long double, 8> item = results.at(index);
+
+        batch_insert += "(" + to_string(item[0]) + ",";
+        batch_insert += to_string(item[1]) + ",";
+        batch_insert += to_string(item[2]) + ",";
+        batch_insert += to_string(item[3]) + ",";
+        batch_insert += to_string(item[4]) + ",";
+        batch_insert += to_string(item[5]) + ",";
+        batch_insert += to_string(item[6]) + ",";
+        batch_insert += to_string(item[7]) + ")";
+
+        //cout << batch_insert << endl;
+
+        if (batch_size <= 10000 && index != (results.size() - 1))
+        {
+            batch_insert += ",";
+        }
+        else
+        {
+            sql_insert_batches.push_back(batch_insert); //TODO: might be pointer
+            batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
+            batch_size = 0;
+        }
+        index++;
+    }
+
+    cout << "Executing SQLs\n";
+
+    for (string SQL : sql_insert_batches) {
+        const char* cSQL = SQL.c_str();
+
+        execSql(db, cSQL);
+        cout << "Inserted 1000 of " << sql_insert_batches.size() * 1000 << endl;
+    }
+
     sqlite3_close(db);
     std::cout << "Hello World!\n";
+    cin >> step;
 }
 
 // Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
