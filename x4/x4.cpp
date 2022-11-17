@@ -60,11 +60,12 @@ void threatF(int step, int start, int end, vector<array<long double, 8>> &result
 
     for (x_1 = start; x_1 >= end; x_1 -= 1) {
         if (limit) {
-            continue;
+            cout << "Limit! \n";
+            break;
         }
-        for (x_2 = start; x_2 >= end; x_2 -= 1) {
-            for (x_3 = start; x_3 >= end; x_3 -= 1) {
-                for (x_4 = start; x_4 >= end; x_4 -= 1) {
+        for (x_2 = step; x_2 >= 0; x_2 -= 1) {
+            for (x_3 = step; x_3 >= 0; x_3 -= 1) {
+                for (x_4 = step; x_4 >= 0; x_4 -= 1) {
 
                     if ((x_1 + x_2 + x_3 + x_4) != step) {
                         continue;
@@ -186,7 +187,6 @@ int main()
     cout << "Results4: " << res4.size() << endl;
     cout << "Results5: " << res5.size() << endl;
     cout << "Results6: " << res6.size() << endl;
-
     
     all.insert(all.end(), res1.begin(), res1.end());
     all.insert(all.end(), res2.begin(), res2.end());
@@ -195,9 +195,17 @@ int main()
     all.insert(all.end(), res5.begin(), res5.end());
     all.insert(all.end(), res6.begin(), res6.end());
 
+    res1.clear();
+    res2.clear();
+    res3.clear();
+    res4.clear();
+    res5.clear();
+    res6.clear();
+
+
+    cout << "Preparing SQLs\n";
 
     vector<string> sql_insert_batches;
-
     int batch_size = 0;
     string batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
     int index = 0;
@@ -225,75 +233,25 @@ int main()
             batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
             batch_size = 0;
         }
+        batch_size++;
         index++;
     }
+    all.clear();
 
     cout << "Executing SQL\n";
 
+    int i = 1;
     for (string SQL : sql_insert_batches) {
         const char* cSQL = SQL.c_str();
 
         execSql(db, cSQL);
-        cout << "Inserted 1000 of " << sql_insert_batches.size()*1000 << endl ;
+        cout << "Inserted " << i*10000 << " of " << sql_insert_batches.size()*10000 << endl ;
+        i++;
     }
 
-    //for (x_1 = step; x_1 >= 0; x_1 -= 1) {
-    //    if (limit) {
-    //        continue;
-    //    }
-    //    for (x_2 = step; x_2 >= 0; x_2 -= 1) {
-    //        for (x_3 = step; x_3 >= 0; x_3 -= 1) {
-    //            for (x_4 = step; x_4 >= 0; x_4 -= 1) {
-
-    //                //std::cout << x_1 + x_2 + x_3 + x_4 << " " << x_1 << " " << x_2 << " " << x_3 << " " << x_4 << std::endl;
-    //                if( (x_1 + x_2 + x_3 + x_4) != step) {
-    //                    continue;
-    //                }
-
-    //                long double sx_1 = x_1 / step;
-    //                long double sx_2 = x_2 / step;
-    //                long double sx_3 = x_3 / step;
-    //                long double sx_4 = x_4 / step;
-
-    //                //std::cout << "step!" << std::endl;
-    //                long double x_1s = getX_1s(sx_1, sx_2, sx_3, sx_4);
-    //                long double x_2s = getX_2s(sx_2, sx_3, sx_4);
-    //                long double x_3s = getX_3s(sx_3, sx_4);
-    //                long double x_4s = getX_4s(sx_4);
-
-    //                std::string SQL = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES(";
-    //                SQL += std::to_string(sx_1) + ",";
-    //                SQL += std::to_string(sx_2) + ",";
-    //                SQL += std::to_string(sx_3) + ",";
-    //                SQL += std::to_string(sx_4) + ",";
-    //                SQL += std::to_string(x_1s) + ",";
-    //                SQL += std::to_string(x_2s) + ",";
-    //                SQL += std::to_string(x_3s) + ",";
-    //                SQL += std::to_string(x_4s) + ")";
-
-    //                const char* cSQL = SQL.c_str();
-
-    //                execSql(db, cSQL);
-
-    //                if (
-    //                    old_x_1s == x_1s
-    //                    && old_x_2s == x_2s
-    //                    && old_x_3s == x_3s
-    //                    && old_x_4s == x_4s
-    //                    ) {
-    //                    limit = true;
-    //                }
-    //                old_x_1s = x_1s;
-    //                old_x_2s = x_2s;
-    //                old_x_3s = x_3s;
-    //                old_x_4s = x_4s;
-
-    //            }
-    //        }
-    //    }
-    //    std::cout << 100 - (100 * (x_1 / step)) << "%" << std::endl;
-    //}
 
     sqlite3_close(db);
     std::cout << "Hello World!\n";
+
+    cin >> step;
 }
