@@ -11,8 +11,13 @@
 #include <array>
 #include <vector>
 #include <thread>
+#include <map>
+#include <filesystem> // C++17 standard header file name
+//#include <experimental/filesystem> // Header file for pre-standard implementation
+#include <fstream>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 long double getX_1s(long double x_1, long double x_2, long double x_3, long double x_4) {
     return x_1 * x_1 + (2 * x_1 * x_2) + (2 * x_1 * x_3) + (2 * x_1 * x_4);
@@ -51,18 +56,49 @@ bool execSql(sqlite3* db, const char *SQL) {
     return true;
 }
 
-void threatF(int step, int start, int end, vector<array<long double, 8>> &results, bool track = false) {
+void resultsForOne(array<long double, 4> initValues, map<string, array<long double, 4>> &results, bool &limit, int &limitSize) {
 
-    long double x_1, x_2, x_3, x_4, old_x_1s = 0, old_x_2s = 0, old_x_3s = 0, old_x_4s = 0;
+    long double
+        x_1 = initValues[0], 
+        x_2 = initValues[1], 
+        x_3 = initValues[2], 
+        x_4 = initValues[3], 
+    i = 0;
+
+    while (i < 1000 && !limit) {
+        i++;
+
+        x_1 = getX_1s(x_1, x_2, x_3, x_4);
+        x_2 = getX_2s(x_2, x_3, x_4);
+        x_3 = getX_3s(x_3, x_4);
+        x_4 = getX_4s(x_4);
+
+        array<long double, 4> arr = {x_1, x_2, x_3, x_4 };
+        string key = to_string(x_1) + "-" + to_string(x_2) + "-" + to_string(x_3) + "-" + to_string(x_4);
+
+        map<string, array<long double, 4>>::iterator it;
+        it = results.find(key);
+
+        results.insert(pair<string, array<long double, 4>>(key, arr));
+        
+        if (it == results.end()) {
+            limit = true;
+            limitSize = distance(results.begin(), it);
+        }
+    }
+
+}
+
+void threatF(int step, int start, int end, bool track = false) {
+
+    long double x_1, x_2, x_3, x_4;
     bool limit = false;
+    int limitSize = 0;
+    map<string, array<long double, 4>> results;
 
     thread::id this_id = this_thread::get_id();
 
     for (x_1 = start; x_1 >= end; x_1 -= 1) {
-        if (limit) {
-            cout << "Limit! \n";
-            break;
-        }
         for (x_2 = step; x_2 >= 0; x_2 -= 1) {
             for (x_3 = step; x_3 >= 0; x_3 -= 1) {
                 for (x_4 = step; x_4 >= 0; x_4 -= 1) {
@@ -76,28 +112,38 @@ void threatF(int step, int start, int end, vector<array<long double, 8>> &result
                     long double sx_3 = x_3 / step;
                     long double sx_4 = x_4 / step;
 
-                    long double x_1s = getX_1s(sx_1, sx_2, sx_3, sx_4);
-                    long double x_2s = getX_2s(sx_2, sx_3, sx_4);
-                    long double x_3s = getX_3s(sx_3, sx_4);
-                    long double x_4s = getX_4s(sx_4);
+                    array<long double, 4> arr = { sx_1, sx_2, sx_3, sx_4};
 
-                    array<long double, 8> arr = { sx_1, sx_2, sx_3, sx_4, x_1s, x_2s, x_3s, x_4s };
+                    string key = to_string(sx_1) + "-" + to_string(sx_2) + "-" + to_string(sx_3) + "-" + to_string(sx_4);
+                    results.insert(pair<string, array<long double, 4>>(key, arr));
+                    resultsForOne(arr, results, limit, limitSize);
 
-                    results.push_back(arr);
+                    string sdir = to_string(sx_1) + "/" + to_string(sx_2) + "/" + to_string(sx_3);
+                    string sfilename = sdir + "/" + to_string(sx_4) + ".txt";
 
-                    if (
-                        old_x_1s == x_1s
-                        && old_x_2s == x_2s
-                        && old_x_3s == x_3s
-                        && old_x_4s == x_4s
-                        ) {
-                        limit = true;
+                    char* dir = new char[sdir.length() + 1];
+                    strcpy_s(dir, sdir.size() + 1, sdir.c_str());
+
+                    char* filename = new char[sfilename.length() + 1];
+                    strcpy_s(filename, sfilename.size() + 1, sfilename.c_str());
+
+                    fs::create_directories(dir);
+
+                    ofstream resFile(filename);
+
+                    resFile << "Limit Reached: " << limit << endl;
+                    resFile << "Limit size: " << limitSize << endl;
+
+                    map<string, array<long double, 4>>::iterator itr;
+
+                    for (itr = results.begin(); itr != results.end(); ++itr) {
+                        resFile << itr->second[0] << "-" 
+                            << itr->second[1] << "-"
+                            << itr->second[2] << "-"
+                            << itr->second[3] << endl;
                     }
-                    old_x_1s = x_1s;
-                    old_x_2s = x_2s;
-                    old_x_3s = x_3s;
-                    old_x_4s = x_4s;
 
+                    resFile.close();
                 }
             }
         }
@@ -125,7 +171,7 @@ int main()
     cin >> step;
     cout << std::endl;
 
-    rc = sqlite3_open("results.db", &db);
+    /*rc = sqlite3_open("results.db", &db);
     if (rc) {
         fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
         return(0);
@@ -146,10 +192,10 @@ int main()
         "x3s            VARCHAR    NOT NULL," \
         "x4s            VARCHAR    NOT NULL)");
 
-    execSql(db, "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES(1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2)");
+    execSql(db, "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES(1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2)");*/
 
     cout << "start!" << std::endl;
-    cout << 0.25 + 0.25 + 0.25 + 0.25 << std::endl;
+    //cout << 0.25 + 0.25 + 0.25 + 0.25 << std::endl;
     bool limit = false;
 
     int proc = step / 6;
@@ -164,14 +210,14 @@ int main()
     cout << "P5 starts: " << (proc * 2) << endl;
     cout << "P6 starts: " << proc << endl;
 
-    vector<array<long double, 8>> all, res1, res2, res3, res4, res5, res6;
+    //vector<array<long double, 8>> all, res1, res2, res3, res4, res5, res6;
 
-    thread thr1(threatF, step, ((proc*6)+last_step_inc), (proc * 5), ref(res1), true);
-    thread thr2(threatF, step, (proc*5), (proc*4), ref(res2), false);
-    thread thr3(threatF, step, (proc*4), (proc*3), ref(res3), false);
-    thread thr4(threatF, step, (proc*3), (proc*2), ref(res4), false);
-    thread thr5(threatF, step, (proc*2), proc, ref(res5), false);
-    thread thr6(threatF, step, proc, 0, ref(res6), true);
+    thread thr1(threatF, step, ((proc*6)+last_step_inc), (proc * 5), true);
+    thread thr2(threatF, step, (proc*5), (proc*4), false);
+    thread thr3(threatF, step, (proc*4), (proc*3), false);
+    thread thr4(threatF, step, (proc*3), (proc*2), false);
+    thread thr5(threatF, step, (proc*2), proc, false);
+    thread thr6(threatF, step, proc, 0, false);
 
     thr1.join();
     thr2.join();
@@ -181,76 +227,76 @@ int main()
     thr6.join();
 
 
-    cout << "Results1: " << res1.size() << endl;
-    cout << "Results2: " << res2.size() << endl;
-    cout << "Results3: " << res3.size() << endl;
-    cout << "Results4: " << res4.size() << endl;
-    cout << "Results5: " << res5.size() << endl;
-    cout << "Results6: " << res6.size() << endl;
-    
-    all.insert(all.end(), res1.begin(), res1.end());
-    all.insert(all.end(), res2.begin(), res2.end());
-    all.insert(all.end(), res3.begin(), res3.end());
-    all.insert(all.end(), res4.begin(), res4.end());
-    all.insert(all.end(), res5.begin(), res5.end());
-    all.insert(all.end(), res6.begin(), res6.end());
+    //cout << "Results1: " << res1.size() << endl;
+    //cout << "Results2: " << res2.size() << endl;
+    //cout << "Results3: " << res3.size() << endl;
+    //cout << "Results4: " << res4.size() << endl;
+    //cout << "Results5: " << res5.size() << endl;
+    //cout << "Results6: " << res6.size() << endl;
+    //
+    //all.insert(all.end(), res1.begin(), res1.end());
+    //all.insert(all.end(), res2.begin(), res2.end());
+    //all.insert(all.end(), res3.begin(), res3.end());
+    //all.insert(all.end(), res4.begin(), res4.end());
+    //all.insert(all.end(), res5.begin(), res5.end());
+    //all.insert(all.end(), res6.begin(), res6.end());
 
-    res1.clear();
-    res2.clear();
-    res3.clear();
-    res4.clear();
-    res5.clear();
-    res6.clear();
-
-
-    cout << "Preparing SQLs\n";
-
-    vector<string> sql_insert_batches;
-    int batch_size = 0;
-    string batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
-    int index = 0;
-    while (index < all.size()) {
-        array<long double, 8> item = all.at(index);
-
-        batch_insert += "(" + to_string(item[0]) + ",";
-        batch_insert += to_string(item[1]) + ",";
-        batch_insert += to_string(item[2]) + ",";
-        batch_insert += to_string(item[3]) + ",";
-        batch_insert += to_string(item[4]) + ",";
-        batch_insert += to_string(item[5]) + ",";
-        batch_insert += to_string(item[6]) + ",";
-        batch_insert += to_string(item[7]) + ")";
-
-        //cout << batch_insert << endl;
-
-        if (batch_size <= 10000 && index != (all.size() - 1))
-        {
-            batch_insert += ",";
-        }
-        else
-        {
-            sql_insert_batches.push_back(batch_insert); //TODO: might be pointer
-            batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
-            batch_size = 0;
-        }
-        batch_size++;
-        index++;
-    }
-    all.clear();
-
-    cout << "Executing SQL\n";
-
-    int i = 1;
-    for (string SQL : sql_insert_batches) {
-        const char* cSQL = SQL.c_str();
-
-        execSql(db, cSQL);
-        cout << "Inserted " << i*10000 << " of " << sql_insert_batches.size()*10000 << endl ;
-        i++;
-    }
+    //res1.clear();
+    //res2.clear();
+    //res3.clear();
+    //res4.clear();
+    //res5.clear();
+    //res6.clear();
 
 
-    sqlite3_close(db);
+    //cout << "Preparing SQLs\n";
+
+    //vector<string> sql_insert_batches;
+    //int batch_size = 0;
+    //string batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
+    //int index = 0;
+    //while (index < all.size()) {
+    //    array<long double, 8> item = all.at(index);
+
+    //    batch_insert += "(" + to_string(item[0]) + ",";
+    //    batch_insert += to_string(item[1]) + ",";
+    //    batch_insert += to_string(item[2]) + ",";
+    //    batch_insert += to_string(item[3]) + ",";
+    //    batch_insert += to_string(item[4]) + ",";
+    //    batch_insert += to_string(item[5]) + ",";
+    //    batch_insert += to_string(item[6]) + ",";
+    //    batch_insert += to_string(item[7]) + ")";
+
+    //    //cout << batch_insert << endl;
+
+    //    if (batch_size <= 10000 && index != (all.size() - 1))
+    //    {
+    //        batch_insert += ",";
+    //    }
+    //    else
+    //    {
+    //        sql_insert_batches.push_back(batch_insert); //TODO: might be pointer
+    //        batch_insert = "INSERT INTO results(x1,x2,x3,x4,x1s,x2s,x3s,x4s) VALUES";
+    //        batch_size = 0;
+    //    }
+    //    batch_size++;
+    //    index++;
+    //}
+    //all.clear();
+
+    //cout << "Executing SQL\n";
+
+    //int i = 1;
+    //for (string SQL : sql_insert_batches) {
+    //    const char* cSQL = SQL.c_str();
+
+    //    execSql(db, cSQL);
+    //    cout << "Inserted " << i*10000 << " of " << sql_insert_batches.size()*10000 << endl ;
+    //    i++;
+    //}
+
+
+    //sqlite3_close(db);
     std::cout << "Hello World!\n";
 
     cin >> step;
