@@ -1,0 +1,1 @@
+C:\"Program Files"\Google\Chrome\Application\chrome.exe --disable-web-security --disable-gpu --allow-file-access-from-files file:///%cd%/reader.html
