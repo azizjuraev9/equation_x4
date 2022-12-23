@@ -70,7 +70,7 @@ void resultsForOne(array<long double, 4> initValues, vector<array<long double, 4
 
     map<string, array<long double, 4>> tmpResults;
 
-    while (i < 50 && !limit) {
+    while (i < 1000 && !limit) {
         i++;
 
         x_1 = getX_1s(x_1, x_2, x_3, x_4);
@@ -125,35 +125,6 @@ void threatF(int step, int start, int end, map<string, vector<array<long double,
                     resultsForOne(arr, resultsFO, limit, limitSize);
                     results.insert(pair<string, vector<array<long double, 4>>>(key, resultsFO));
 
-
-                    //string sdir = "results/" + to_string(sx_1) + "/" + to_string(sx_2) + "/" + to_string(sx_3);
-                    //string sfilename = sdir + "/" + to_string(sx_4) + ".txt";
-
-                    //char* dir = new char[sdir.length() + 1];
-                    //strcpy_s(dir, sdir.size() + 1, sdir.c_str());
-
-                    //char* filename = new char[sfilename.length() + 1];
-                    //strcpy_s(filename, sfilename.size() + 1, sfilename.c_str());
-
-                    //fs::create_directories(dir);
-
-                    //ofstream resFile(filename);
-
-                    //resFile << "Limit Reached: " << limit << endl;
-                    ////resFile << "Limit size: " << limitSize << endl;
-
-                    //map<string, array<long double, 4>>::iterator itr;
-
-                    //for (itr = results.begin(); itr != results.end(); ++itr) {
-                    //    resFile << fixed;
-                    //    resFile << setprecision(15);
-                    //    resFile << itr->second[0] << " | " 
-                    //        << itr->second[1] << " | "
-                    //        << itr->second[2] << " | "
-                    //        << itr->second[3] << endl;
-                    //}
-
-                    //resFile.close();
                 }
             }
         }
@@ -261,28 +232,28 @@ int main()
             std::ostringstream x1_str, x2_str, x3_str, x4_str;
 
             x1_str << fixed;
-            x1_str << setprecision(15); 
+            x1_str << setprecision(13); 
             x1_str << item[0];
 
             x2_str << fixed;
-            x2_str << setprecision(15); 
+            x2_str << setprecision(13);
             x2_str << item[1];
 
             x3_str << fixed;
-            x3_str << setprecision(15); 
+            x3_str << setprecision(13);
             x3_str << item[2];
 
             x4_str << fixed;
-            x4_str << setprecision(15); 
+            x4_str << setprecision(13);
             x4_str << item[3];
 
             batch_insert += "(\"" + x.first + "\",";
-            batch_insert += x1_str.str() + ",";
-            batch_insert += x2_str.str() + ",";
-            batch_insert += x3_str.str() + ",";
-            batch_insert += x4_str.str() + ")";
+            batch_insert += "\"" + x1_str.str() + "\",";
+            batch_insert += "\"" + x2_str.str() + "\",";
+            batch_insert += "\"" + x3_str.str() + "\",";
+            batch_insert += "\"" + x4_str.str() + "\")";
 
-            if (batch_size <= 10000 && index != (results.size() - 1))
+            if (batch_size <= 100000 && index != (results.size() - 1))
             {
                 batch_insert += ",";
             }
